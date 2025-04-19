@@ -1,0 +1,89 @@
+./#!/usr/bin/env bash
+
+user=interview_test
+other_user=other_interview_test
+port=8888
+
+gpg --list-key $user
+RESULT=$?
+if [ $RESULT -eq 0 ]; then
+  echo "using found key"
+else
+  echo "First generate a test key with key id of $user"
+  exit 1
+fi
+gpg --list-key $other_user
+RESULT=$?
+if [ $RESULT -eq 0 ]; then
+  echo "using found key"
+else
+  echo "First generate a *second* test key with key id of $other_user"
+  exit 1
+fi
+
+gpg --yes --output $user.key --export $user
+gpg --yes --output $other_user.key --export $other_user
+
+echo
+echo "sending request before generating a nonce"
+curl localhost:$port/verify \
+ --form "key=@$(pwd)/$user.key" \
+ --form "signed=@$(pwd)/$user.key"
+echo
+
+curl localhost:$port/nonce --form "key=@$(pwd)/$user.key" > $user.nonce
+
+gpg --local-user $user --yes --output $user.signed_nonce --sign $user.nonce
+
+
+echo
+echo "sending request with nonce set but with a not-signed file"
+curl localhost:$port/verify \
+ --form "key=@$(pwd)/$user.key" \
+ --form "signed=@$(pwd)/$user.key"
+echo
+
+echo
+echo "sending a different key"
+curl localhost:$port/nonce --form "key=@$(pwd)/$other_user.key" > $user.nonce
+curl localhost:$port/verify \
+ --form "key=@$(pwd)/$other_user.key" \
+ --form "signed=@$(pwd)/$user.signed_nonce"
+echo
+
+echo
+echo "sending a request with signed, but incorrect nonce"
+echo foobarbaz > bad_nonce
+gpg --local-user $user --yes --output signed_bad_nonce --sign bad_nonce
+
+curl localhost:$port/verify \
+ --form "key=@$(pwd)/$user.key" \
+ --form "signed=@$(pwd)/signed_bad_nonce"
+echo
+
+echo
+echo "sending first valid request"
+
+curl localhost:$port/verify \
+ --form "key=@$(pwd)/$user.key" \
+ --form "signed=@$(pwd)/$user.signed_nonce"
+
+
+echo
+echo
+echo "sending the same payload again"
+
+curl localhost:$port/verify \
+ --form "key=@$(pwd)/$user.key" \
+ --form "signed=@$(pwd)/$user.signed_nonce"
+
+echo
+
+rm $user.key
+rm $other_user.key
+
+rm $user.nonce
+rm $user.signed_nonce
+
+rm bad_nonce
+rm signed_bad_nonce

@@ -1,0 +1,12 @@
+[package]
+name = "sign-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-multipart = "0.7.2"
+actix-web = "4.10.2"
+anyhow = "1.0.98"
+pgp = "0.15.0"
+serde = {version = "1.0.217", features = ["derive"]}
+tokio = { version = "1.44.2", features = ["full"]}
